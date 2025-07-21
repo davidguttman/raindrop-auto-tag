@@ -13,8 +13,19 @@ Automatically tag untagged raindrops using AI suggestions from the Raindrop.io A
 
 ## Usage
 
+**One-time execution:**
+```bash
+node auto-tag.js
+```
+
+**Continuous auto-loop (runs every 60 seconds):**
 ```bash
 node index.js
+```
+
+**Custom interval:**
+```bash
+CYCLE_TIMEOUT_SECONDS=300 node index.js  # Run every 5 minutes
 ```
 
 The script will:
