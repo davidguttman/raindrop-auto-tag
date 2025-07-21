@@ -104,7 +104,7 @@ async function findMostRecentUntaggedRaindrop() {
     }
 
     try {
-        const response = await fetch('https://api.raindrop.io/rest/v1/raindrops/0?sort=-created', {
+        const response = await fetch(`https://api.raindrop.io/rest/v1/raindrops/0?sort=-created&perpage=50&search=notag:true`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -116,14 +116,8 @@ async function findMostRecentUntaggedRaindrop() {
 
         const data = await response.json();
         
-        // Find the first raindrop without tags (excluding those marked with #error)
-        const untaggedRaindrop = data.items.find(raindrop => {
-            if (!raindrop.tags || raindrop.tags.length === 0) {
-                return true; // No tags at all
-            }
-            // Has tags but check if they're all empty strings and no #error tag
-            return !raindrop.tags.includes('#error') && raindrop.tags.every(tag => tag === '');
-        });
+        // Get the first untagged raindrop (search already excludes #error tagged items)
+        const untaggedRaindrop = data.items?.[0];
 
         if (untaggedRaindrop) {
             console.log(`Found untagged raindrop: "${untaggedRaindrop.title}"`);
