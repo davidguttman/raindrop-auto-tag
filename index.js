@@ -23,6 +23,31 @@ async function getTagSuggestions(raindropId, token) {
     }
 }
 
+async function updateRaindropTags(raindropId, tags, token) {
+    try {
+        const response = await fetch(`https://api.raindrop.io/rest/v1/raindrop/${raindropId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                tags: tags
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Update raindrop API request failed: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error updating raindrop tags:', error.message);
+        throw error;
+    }
+}
+
 async function findMostRecentUntaggedRaindrop() {
     const token = process.env.RD_TOKEN;
     
@@ -61,6 +86,12 @@ async function findMostRecentUntaggedRaindrop() {
                 tagSuggestions.forEach((tag, index) => {
                     console.log(`${index + 1}. ${tag}`);
                 });
+                
+                // Update the raindrop with the suggested tags
+                console.log('\nUpdating raindrop with suggested tags...');
+                const updateResult = await updateRaindropTags(untaggedRaindrop._id, tagSuggestions, token);
+                console.log('Raindrop updated successfully!');
+                console.log('Updated raindrop tags:', updateResult.item.tags);
             } else {
                 console.log('No tag suggestions found');
             }
