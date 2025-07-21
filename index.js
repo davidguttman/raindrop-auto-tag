@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 async function getTagSuggestions(raindropId, token) {
     try {
@@ -13,9 +13,6 @@ async function getTagSuggestions(raindropId, token) {
         }
 
         const data = await response.json();
-        console.log('Full suggest API response:');
-        console.log(JSON.stringify(data, null, 2));
-        
         return data.item?.tags || [];
     } catch (error) {
         console.error('Error getting tag suggestions:', error.message);
@@ -74,26 +71,23 @@ async function findMostRecentUntaggedRaindrop() {
         );
 
         if (untaggedRaindrop) {
-            console.log('Most recent untagged raindrop:');
-            console.log(JSON.stringify(untaggedRaindrop, null, 2));
+            console.log(`Found untagged raindrop: "${untaggedRaindrop.title}"`);
+            console.log(`URL: ${untaggedRaindrop.link}`);
+            console.log(`Created: ${new Date(untaggedRaindrop.created).toLocaleString()}`);
             
             // Get tag suggestions
-            console.log('\nGetting tag suggestions...');
+            console.log('\nGetting AI tag suggestions...');
             const tagSuggestions = await getTagSuggestions(untaggedRaindrop._id, token);
             
             if (tagSuggestions.length > 0) {
-                console.log('\nTag suggestions:');
-                tagSuggestions.forEach((tag, index) => {
-                    console.log(`${index + 1}. ${tag}`);
-                });
+                console.log(`Found ${tagSuggestions.length} suggested tags: ${tagSuggestions.join(', ')}`);
                 
                 // Update the raindrop with the suggested tags
-                console.log('\nUpdating raindrop with suggested tags...');
+                console.log('\nApplying tags...');
                 const updateResult = await updateRaindropTags(untaggedRaindrop._id, tagSuggestions, token);
-                console.log('Raindrop updated successfully!');
-                console.log('Updated raindrop tags:', updateResult.item.tags);
+                console.log('✅ Raindrop successfully tagged!');
             } else {
-                console.log('No tag suggestions found');
+                console.log('❌ No tag suggestions found');
             }
             
         } else {
