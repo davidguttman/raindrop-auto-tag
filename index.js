@@ -116,10 +116,14 @@ async function findMostRecentUntaggedRaindrop() {
 
         const data = await response.json();
         
-        // Find the first raindrop without tags
-        const untaggedRaindrop = data.items.find(raindrop => 
-            !raindrop.tags || raindrop.tags.length === 0
-        );
+        // Find the first raindrop without tags (excluding those marked with #error)
+        const untaggedRaindrop = data.items.find(raindrop => {
+            if (!raindrop.tags || raindrop.tags.length === 0) {
+                return true; // No tags at all
+            }
+            // Has tags but check if they're all empty strings and no #error tag
+            return !raindrop.tags.includes('#error') && raindrop.tags.every(tag => tag === '');
+        });
 
         if (untaggedRaindrop) {
             console.log(`Found untagged raindrop: "${untaggedRaindrop.title}"`);
@@ -139,10 +143,26 @@ async function findMostRecentUntaggedRaindrop() {
                 
                 // Update the raindrop with the deduplicated tags
                 console.log('\nApplying tags...');
-                const updateResult = await updateRaindropTags(untaggedRaindrop._id, deduplicatedTags, token);
-                console.log('✅ Raindrop successfully tagged!');
+                try {
+                    const updateResult = await updateRaindropTags(untaggedRaindrop._id, deduplicatedTags, token);
+                    console.log('✅ Raindrop successfully tagged!');
+                } catch (error) {
+                    console.log('❌ Failed to apply tags, marking with #error tag to prevent retry...');
+                    try {
+                        await updateRaindropTags(untaggedRaindrop._id, ['#error'], token);
+                        console.log('🏷️ Added #error tag to prevent future attempts');
+                    } catch (errorTagError) {
+                        console.log('⚠️ Could not even apply #error tag - this raindrop may be stuck');
+                    }
+                }
             } else {
-                console.log('❌ No tag suggestions found');
+                console.log('❌ No tag suggestions found, marking with #error tag to prevent retry...');
+                try {
+                    await updateRaindropTags(untaggedRaindrop._id, ['#error'], token);
+                    console.log('🏷️ Added #error tag to prevent future attempts');
+                } catch (errorTagError) {
+                    console.log('⚠️ Could not even apply #error tag - this raindrop may be stuck');
+                }
             }
             
         } else {
