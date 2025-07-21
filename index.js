@@ -1,5 +1,56 @@
 require('dotenv').config({ quiet: true });
 
+function levenshteinDistance(a, b) {
+    const matrix = [];
+    
+    // Create matrix
+    for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+    }
+    
+    // Fill matrix
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1, // substitution
+                    matrix[i][j - 1] + 1,     // insertion
+                    matrix[i - 1][j] + 1      // deletion
+                );
+            }
+        }
+    }
+    
+    return matrix[b.length][a.length];
+}
+
+function deduplicateTags(tags) {
+    const acceptedTags = [];
+    
+    for (const tag of tags) {
+        let shouldAdd = true;
+        
+        for (const acceptedTag of acceptedTags) {
+            if (levenshteinDistance(tag.toLowerCase(), acceptedTag.toLowerCase()) <= 2) {
+                shouldAdd = false;
+                break;
+            }
+        }
+        
+        if (shouldAdd) {
+            acceptedTags.push(tag);
+        }
+    }
+    
+    return acceptedTags;
+}
+
 async function getTagSuggestions(raindropId, token) {
     try {
         const response = await fetch(`https://api.raindrop.io/rest/v1/raindrop/${raindropId}/suggest`, {
@@ -80,11 +131,15 @@ async function findMostRecentUntaggedRaindrop() {
             const tagSuggestions = await getTagSuggestions(untaggedRaindrop._id, token);
             
             if (tagSuggestions.length > 0) {
-                console.log(`Found ${tagSuggestions.length} suggested tags: ${tagSuggestions.join(', ')}`);
+                console.log(`Original tags (${tagSuggestions.length}): ${tagSuggestions.join(', ')}`);
                 
-                // Update the raindrop with the suggested tags
+                // Remove similar tags using Levenshtein distance
+                const deduplicatedTags = deduplicateTags(tagSuggestions);
+                console.log(`Accepted tags (${deduplicatedTags.length}): ${deduplicatedTags.join(', ')}`);
+                
+                // Update the raindrop with the deduplicated tags
                 console.log('\nApplying tags...');
-                const updateResult = await updateRaindropTags(untaggedRaindrop._id, tagSuggestions, token);
+                const updateResult = await updateRaindropTags(untaggedRaindrop._id, deduplicatedTags, token);
                 console.log('✅ Raindrop successfully tagged!');
             } else {
                 console.log('❌ No tag suggestions found');
