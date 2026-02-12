@@ -96,28 +96,50 @@ async function updateRaindropTags(raindropId, tags, token) {
     }
 }
 
+// Tags that don't "count" — items with only these tags are treated as untagged
+const IGNORED_TAGS = ['ifttt', 'reddit'];
+
+async function fetchRaindrops(url, token) {
+    const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.items || [];
+}
+
+function needsTagging(raindrop) {
+    const tags = raindrop.tags || [];
+    if (tags.length === 0) return true;
+    return tags.every(t => IGNORED_TAGS.includes(t.toLowerCase()));
+}
+
 async function findMostRecentUntaggedRaindrop() {
     const token = process.env.RD_TOKEN;
-    
+
     if (!token) {
         throw new Error('RD_TOKEN not found in environment variables');
     }
 
     try {
-        const response = await fetch(`https://api.raindrop.io/rest/v1/raindrops/0?sort=-created&perpage=50&search=notag:true`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        // Fetch truly untagged items and items with only ignored tags
+        const [untaggedItems, ...ignoredTagItems] = await Promise.all([
+            fetchRaindrops(`https://api.raindrop.io/rest/v1/raindrops/0?sort=-created&perpage=50&search=notag:true`, token),
+            ...IGNORED_TAGS.map(tag =>
+                fetchRaindrops(`https://api.raindrop.io/rest/v1/raindrops/0?sort=-created&perpage=50&search=${encodeURIComponent(`tag:${tag}`)}`, token)
+            )
+        ]);
 
-        if (!response.ok) {
-            throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-        }
+        // Combine and deduplicate by _id, then filter to items that actually need tagging
+        const seen = new Set();
+        const candidates = [...untaggedItems, ...ignoredTagItems.flat()]
+            .filter(r => { if (seen.has(r._id)) return false; seen.add(r._id); return true; })
+            .filter(needsTagging)
+            .sort((a, b) => new Date(b.created) - new Date(a.created));
 
-        const data = await response.json();
-        
-        // Get the first untagged raindrop (search already excludes #error tagged items)
-        const untaggedRaindrop = data.items?.[0];
+        const untaggedRaindrop = candidates[0];
 
         if (untaggedRaindrop) {
             console.log(`Found untagged raindrop: "${untaggedRaindrop.title}"`);
@@ -131,11 +153,12 @@ async function findMostRecentUntaggedRaindrop() {
             if (tagSuggestions.length > 0) {
                 console.log(`Original tags (${tagSuggestions.length}): ${tagSuggestions.join(', ')}`);
                 
-                // Remove similar tags using Levenshtein distance
-                const deduplicatedTags = deduplicateTags(tagSuggestions);
+                // Remove similar tags and filter out ignored tags
+                const deduplicatedTags = deduplicateTags(tagSuggestions)
+                    .filter(t => !IGNORED_TAGS.includes(t.toLowerCase()));
                 console.log(`Accepted tags (${deduplicatedTags.length}): ${deduplicatedTags.join(', ')}`);
-                
-                // Update the raindrop with the deduplicated tags
+
+                // Update the raindrop with the deduplicated tags (replaces ignored tags)
                 console.log('\nApplying tags...');
                 try {
                     const updateResult = await updateRaindropTags(untaggedRaindrop._id, deduplicatedTags, token);
