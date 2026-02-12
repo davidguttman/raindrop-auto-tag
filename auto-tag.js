@@ -128,7 +128,7 @@ async function findMostRecentUntaggedRaindrop() {
         const [untaggedItems, ...ignoredTagItems] = await Promise.all([
             fetchRaindrops(`https://api.raindrop.io/rest/v1/raindrops/0?sort=-created&perpage=50&search=notag:true`, token),
             ...IGNORED_TAGS.map(tag =>
-                fetchRaindrops(`https://api.raindrop.io/rest/v1/raindrops/0?sort=-created&perpage=50&search=${encodeURIComponent(`tag:${tag}`)}`, token)
+                fetchRaindrops(`https://api.raindrop.io/rest/v1/raindrops/0?sort=-created&perpage=50&search=${encodeURIComponent(`#${tag}`)}`, token)
             )
         ]);
 
